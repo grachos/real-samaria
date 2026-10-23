@@ -36,7 +36,9 @@ export default function PlayersPage() {
   });
   const activeCount = all.filter((r) => r.p.active).length;
   const inactiveCount = all.length - activeCount;
-  const rows = all.filter((r) => r.p.active !== showInactive);
+  // Si ya no quedan jugadoras de baja, se vuelve a la lista de activas.
+  const viewInactive = showInactive && inactiveCount > 0;
+  const rows = all.filter((r) => r.p.active !== viewInactive);
 
   function startEdit(p: Player) {
     setEditingId(p.id);
