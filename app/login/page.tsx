@@ -44,15 +44,15 @@ export default function LoginPage() {
             width={96}
             height={96}
             priority
-            className="rounded-full"
+            className="splash-logo rounded-full"
           />
-          <div>
+          <div className="splash-in">
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Real Samaria</h1>
             <p className="text-sm text-zinc-400">Panel del club</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+        <div className="splash-in rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Field label="Correo">
               <input
