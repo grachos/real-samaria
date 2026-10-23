@@ -8,7 +8,7 @@ type Tournament = { id: string; name: string; starts_on: string | null };
 type GoalRow = { tournament_id: string; player_id: string; goals: number };
 
 const input =
-  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-white outline-none focus:border-[#c9a24e]";
+  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-base text-white outline-none focus:border-[#c9a24e]";
 
 export default function TournamentsPage() {
   const { players } = useClubData();

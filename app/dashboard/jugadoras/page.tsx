@@ -6,7 +6,7 @@ import { money, owedMonths, todayISO } from "@/lib/club";
 import { useClubData } from "@/lib/club-data";
 
 const input =
-  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-white outline-none focus:border-[#c9a24e]";
+  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-base text-white outline-none focus:border-[#c9a24e]";
 
 export default function PlayersPage() {
   const { players, payments, fee, error: loadError, reload } = useClubData();

@@ -14,7 +14,7 @@ type Entry = {
 };
 
 const input =
-  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-white outline-none focus:border-[#c9a24e]";
+  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-base text-white outline-none focus:border-[#c9a24e]";
 
 export default function FinancePage() {
   const { payments, loaded } = useClubData();
