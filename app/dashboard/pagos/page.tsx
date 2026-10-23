@@ -12,7 +12,6 @@ type Tab = "registrar" | "pendientes" | "historial";
 export default function PaymentsPage() {
   const { players, payments, fee, error: loadError, reload } = useClubData();
   const today = todayISO();
-  const active = players.filter((p) => p.active);
   const names = Object.fromEntries(players.map((p) => [p.id, p.full_name]));
 
   const [tab, setTab] = useState<Tab>("registrar");
@@ -27,6 +26,9 @@ export default function PaymentsPage() {
     bank: "",
     paid_on: today,
   });
+
+  // Las jugadoras dadas de baja siguen apareciendo mientras tengan deuda pendiente.
+  const active = players.filter((p) => p.active || owedMonths(p, payments, fee, today).length > 0);
 
   const method = PAYMENT_METHODS.find((m) => m.value === form.payment_method);
   const selected = active.find((p) => p.id === form.player_id);
@@ -120,6 +122,7 @@ export default function PaymentsPage() {
                     {active.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.full_name}
+                        {p.active ? "" : " (de baja)"}
                       </option>
                     ))}
                   </select>

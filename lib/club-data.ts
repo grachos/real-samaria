@@ -17,7 +17,7 @@ export function useClubData() {
     const [p, pay, s] = await Promise.all([
       supabase
         .from("players")
-        .select("id, full_name, shirt_number, joined_on, payment_day, active")
+        .select("*")
         .order("shirt_number", { ascending: true, nullsFirst: false }),
       supabase
         .from("payments")

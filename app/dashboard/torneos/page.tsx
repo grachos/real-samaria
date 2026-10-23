@@ -67,11 +67,11 @@ export default function TournamentsPage() {
   const ranking = useMemo(() => {
     const m = new Map<string, number>();
     goals.forEach((g) => m.set(g.player_id, (m.get(g.player_id) ?? 0) + g.goals));
-    return active
+    return players
       .map((p) => ({ name: p.full_name, goals: m.get(p.id) ?? 0 }))
       .filter((x) => x.goals > 0)
       .sort((a, b) => b.goals - a.goals);
-  }, [goals, active]);
+  }, [goals, players]);
 
   const selectedName = tournaments.find((t) => t.id === selected)?.name ?? "";
   const selectedTotal = active.reduce((s, p) => s + Number(draft[p.id] ?? 0), 0);

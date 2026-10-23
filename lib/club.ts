@@ -14,6 +14,7 @@ export type Player = {
   joined_on: string;
   payment_day: number;
   active: boolean;
+  deactivated_on?: string | null;
 };
 
 export type Payment = {
@@ -65,10 +66,12 @@ export function owedMonths(
   const start = joinedDay > player.payment_day ? addMonths(joinedMonth, 1) : joinedMonth;
   const paid = paidByMonth(payments, player.id);
   const owed: Owed[] = [];
-  for (let m = start; m <= today.slice(0, 7); m = addMonths(m, 1)) {
+  // Una jugadora dada de baja deja de generar deuda desde su fecha de baja.
+  const end = player.deactivated_on && player.deactivated_on < today ? player.deactivated_on : today;
+  for (let m = start; m <= end.slice(0, 7); m = addMonths(m, 1)) {
     const due = `${m}-${pad(player.payment_day)}`;
     const remaining = fee - (paid.get(m) ?? 0);
-    if (due < today && remaining > 0) owed.push({ month: m, remaining });
+    if (due < end && remaining > 0) owed.push({ month: m, remaining });
   }
   return owed;
 }

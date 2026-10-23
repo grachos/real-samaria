@@ -13,7 +13,9 @@ export type IconName =
   | "trash"
   | "shield"
   | "gauge"
-  | "download";
+  | "download"
+  | "edit"
+  | "undo";
 
 const PATHS: Record<IconName, ReactNode> = {
   users: (
@@ -55,6 +57,18 @@ const PATHS: Record<IconName, ReactNode> = {
   close: <path d="M18 6 6 18M6 6l12 12" />,
   trash: <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />,
   shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />,
+  edit: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </>
+  ),
+  undo: (
+    <>
+      <path d="M3 7v6h6" />
+      <path d="M21 17a9 9 0 0 0-15-6.7L3 13" />
+    </>
+  ),
   download: (
     <>
       <path d="M12 3v12M7 10l5 5 5-5" />

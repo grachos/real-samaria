@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { PAYMENT_METHODS, money } from "@/lib/club";
-import { Card, Empty, Notice, PageHeader, Stat } from "@/components/ui";
+import { Badge, Card, Empty, Notice, PageHeader, Stat } from "@/components/ui";
 
-type Named = { name: string; goals: number };
+type Named = { name: string; goals: number; active?: boolean };
 type Monthly = { month: string; cuotas: number; otros_ingresos: number; gastos: number };
 type Data = {
   fee: number | null;
@@ -25,7 +25,8 @@ type Data = {
   paid_this_month: number;
   due_this_month: number;
   overdue_this_month: number;
-  overdue_list: { name: string; owed: number }[];
+  overdue_list: { name: string; owed: number; months: number; active: boolean }[];
+  debt_total?: number;
   top_scorers: Named[];
   goals_by_tournament: Named[];
   payments_by_method: { method: string; total: number; count: number }[];
@@ -202,6 +203,11 @@ export default function IndicatorsPage() {
                   <span className="text-sm">
                     <span className="mr-3 inline-block w-5 text-zinc-500">{i + 1}</span>
                     {s.name}
+                    {s.active === false && (
+                      <span className="ml-2">
+                        <Badge tone="neutral">De baja</Badge>
+                      </span>
+                    )}
                   </span>
                   <span className="font-semibold text-[#c9a24e]">{s.goals}</span>
                 </li>
@@ -211,15 +217,30 @@ export default function IndicatorsPage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 text-base font-semibold">Atrasadas este mes</h2>
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-semibold">Deuda pendiente</h2>
+            {(data.debt_total ?? 0) > 0 && (
+              <span className="text-sm font-semibold text-red-300">{money(data.debt_total ?? 0)}</span>
+            )}
+          </div>
           {data.overdue_list.length === 0 ? (
-            <Empty>Nadie está atrasada este mes.</Empty>
+            <Empty>Nadie tiene deuda pendiente.</Empty>
           ) : (
             <ul className="flex flex-col">
               {data.overdue_list.map((o) => (
                 <li key={o.name} className="flex items-center justify-between border-b border-zinc-800 py-2.5 last:border-0">
-                  <span className="text-sm">{o.name}</span>
-                  <span className="text-sm font-semibold text-red-300">{money(o.owed)}</span>
+                  <span className="min-w-0 text-sm">
+                    {o.name}
+                    <span className="ml-2 text-xs text-zinc-500">
+                      {o.months} {o.months === 1 ? "mes" : "meses"}
+                    </span>
+                    {!o.active && (
+                      <span className="ml-2">
+                        <Badge tone="neutral">De baja</Badge>
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold text-red-300">{money(o.owed)}</span>
                 </li>
               ))}
             </ul>
