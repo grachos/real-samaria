@@ -246,7 +246,7 @@ export default function PlayersPage() {
               key={String(t.v)}
               onClick={() => setShowInactive(t.v)}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                showInactive === t.v
+                viewInactive === t.v
                   ? "bg-[#c9a24e]/10 text-[#c9a24e]"
                   : "bg-zinc-900 text-zinc-400 hover:text-zinc-100"
               }`}
@@ -260,7 +260,7 @@ export default function PlayersPage() {
       {rows.length === 0 ? (
         <Card>
           <Empty>
-            {showInactive
+            {viewInactive
               ? "No hay jugadoras de baja."
               : "Aún no hay jugadoras. Agrega la primera con “Nueva jugadora”."}
           </Empty>
