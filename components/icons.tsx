@@ -10,7 +10,9 @@ export type IconName =
   | "plus"
   | "minus"
   | "close"
-  | "trash";
+  | "trash"
+  | "shield"
+  | "gauge";
 
 const PATHS: Record<IconName, ReactNode> = {
   users: (
@@ -51,6 +53,13 @@ const PATHS: Record<IconName, ReactNode> = {
   minus: <path d="M5 12h14" />,
   close: <path d="M18 6 6 18M6 6l12 12" />,
   trash: <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />,
+  shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />,
+  gauge: (
+    <>
+      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+      <path d="M12 14l4-4" />
+    </>
+  ),
 };
 
 export function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: string }) {
