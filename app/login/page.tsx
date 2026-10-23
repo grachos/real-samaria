@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { Button, Field, inputCls, Notice } from "@/components/ui";
+import InstallButton from "@/components/install-button";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -79,6 +80,9 @@ export default function LoginPage() {
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>
           </form>
+        </div>
+        <div className="splash-in mt-5 flex justify-center">
+          <InstallButton popover="up" className="rounded-xl px-3 py-2 text-zinc-400 hover:text-[#c9a24e]" />
         </div>
       </div>
     </main>

@@ -12,7 +12,8 @@ export type IconName =
   | "close"
   | "trash"
   | "shield"
-  | "gauge";
+  | "gauge"
+  | "download";
 
 const PATHS: Record<IconName, ReactNode> = {
   users: (
@@ -54,6 +55,12 @@ const PATHS: Record<IconName, ReactNode> = {
   close: <path d="M18 6 6 18M6 6l12 12" />,
   trash: <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />,
   shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />,
+  download: (
+    <>
+      <path d="M12 3v12M7 10l5 5 5-5" />
+      <path d="M4 21h16" />
+    </>
+  ),
   gauge: (
     <>
       <path d="M3.34 19a10 10 0 1 1 17.32 0" />

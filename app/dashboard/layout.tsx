@@ -8,6 +8,7 @@ import { getSupabase } from "@/lib/supabase";
 import type { ModuleKey } from "@/lib/access";
 import { Icon, type IconName } from "@/components/icons";
 import { Button, Card } from "@/components/ui";
+import InstallButton from "@/components/install-button";
 
 const NAV: { href: string; label: string; short: string; icon: IconName; module: ModuleKey }[] = [
   { href: "/dashboard/indicadores", label: "Indicadores", short: "Indicadores", icon: "gauge", module: "indicadores" },
@@ -98,7 +99,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const blocked = current !== undefined && !modules.includes(current.module);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100 md:block md:h-auto md:min-h-screen md:overflow-visible">
       {/* Escritorio: barra lateral con íconos */}
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-zinc-800 bg-black md:flex">
         <div className="flex items-center gap-3 px-6 py-6">
@@ -129,6 +130,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </nav>
         <div className="m-3 border-t border-zinc-800 pt-3">
           <p className="truncate px-3 pb-2 text-xs text-zinc-500">{userName}</p>
+          <InstallButton
+            popover="up"
+            className="mb-1 w-full rounded-xl px-3 py-2.5 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+          />
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
@@ -140,17 +145,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Móvil: encabezado mínimo */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-zinc-800 bg-black/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
+      <header className="z-30 flex shrink-0 items-center justify-between border-b border-zinc-800 bg-black/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-real-samaria.jpeg" alt="" width={32} height={32} className="rounded-full" />
           <span className="text-sm font-semibold text-[#c9a24e]">Real Samaria</span>
         </div>
-        <button onClick={logout} aria-label="Salir" className="rounded-lg p-2 text-zinc-400 hover:text-zinc-100">
-          <Icon name="logout" />
-        </button>
+        <div className="flex items-center gap-1">
+          <InstallButton label={false} className="rounded-lg p-2 text-zinc-400 hover:text-zinc-100" />
+          <button onClick={logout} aria-label="Salir" className="rounded-lg p-2 text-zinc-400 hover:text-zinc-100">
+            <Icon name="logout" />
+          </button>
+        </div>
       </header>
 
-      <main className="px-4 py-6 pb-28 md:ml-64 md:px-10 md:py-10 md:pb-10">
+      <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-6 md:ml-64 md:flex-none md:overflow-visible md:px-10 md:py-10">
         <div className="mx-auto max-w-5xl">
           {blocked ? (
             <Card className="text-center">
@@ -179,7 +187,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </main>
 
       {/* Móvil: menú inferior con íconos, desplazable si hay muchos módulos */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-zinc-800 bg-black/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav className="z-30 flex shrink-0 overflow-x-auto border-t border-zinc-800 bg-black/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {allowed.map((item) => {
           const active = pathname.startsWith(item.href);
           return (

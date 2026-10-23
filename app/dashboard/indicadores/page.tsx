@@ -268,7 +268,7 @@ function BarList({
       {items.map((i) => (
         <li key={i.label}>
           <div className="mb-1.5 flex justify-between gap-3 text-sm">
-            <span className="truncate text-zinc-200">{i.label}</span>
+            <span className="min-w-0 truncate text-zinc-200">{i.label}</span>
             <span className="shrink-0 text-zinc-400">
               {format(i.value)}
               {i.sub ? ` · ${i.sub}` : ""}
