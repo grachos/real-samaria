@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Real Samaria CP",
-    short_name: "Real Samaria",
+    short_name: "Real Samaria CP",
     description: "Seguimiento de jugadoras, pagos y goles",
     start_url: "/",
     display: "standalone",

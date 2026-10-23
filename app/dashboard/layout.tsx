@@ -105,8 +105,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-3 px-6 py-6">
           <Image src="/logo-real-samaria.jpeg" alt="" width={40} height={40} className="rounded-full" />
           <div>
-            <p className="text-sm font-semibold text-[#c9a24e]">Real Samaria</p>
-            <p className="text-xs text-zinc-500">CP 2026</p>
+            <p className="text-sm font-semibold text-[#c9a24e]">Real Samaria CP</p>
+            <p className="text-xs text-zinc-500">Panel del club</p>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-3">
@@ -148,7 +148,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <header className="z-30 flex shrink-0 items-center justify-between border-b border-zinc-800 bg-black/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-real-samaria.jpeg" alt="" width={32} height={32} className="rounded-full" />
-          <span className="text-sm font-semibold text-[#c9a24e]">Real Samaria</span>
+          <span className="text-sm font-semibold text-[#c9a24e]">Real Samaria CP</span>
         </div>
         <div className="flex items-center gap-1">
           <InstallButton label={false} className="rounded-lg p-2 text-zinc-400 hover:text-zinc-100" />

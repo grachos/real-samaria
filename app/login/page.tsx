@@ -48,7 +48,7 @@ export default function LoginPage() {
             className="splash-logo rounded-full"
           />
           <div className="splash-in">
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Real Samaria</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Real Samaria CP</h1>
             <p className="text-sm text-zinc-400">Panel del club</p>
           </div>
         </div>

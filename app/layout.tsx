@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "Seguimiento de jugadoras y pagos — Real Samaria CP 2026",
   appleWebApp: {
     capable: true,
-    title: "Real Samaria",
+    title: "Real Samaria CP",
     statusBarStyle: "black-translucent",
   },
   icons: { apple: "/apple-touch-icon.png" },
