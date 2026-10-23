@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 
+const LINKS = [
+  { href: "/dashboard/jugadoras", label: "Jugadoras" },
+  { href: "/dashboard/pagos", label: "Pagos" },
+  { href: "/dashboard/finanzas", label: "Finanzas" },
+  { href: "/dashboard/torneos", label: "Torneos" },
+];
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -36,18 +43,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-black text-zinc-100">
-      <header className="flex items-center justify-between border-b border-[#c9a24e]/40 px-4 py-3">
-        <nav className="flex gap-4 text-sm">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#c9a24e]/40 px-4 py-3">
+        <nav className="flex flex-wrap gap-4 text-sm">
           <span className="font-semibold text-[#c9a24e]">Real Samaria</span>
-          <Link href="/dashboard/jugadoras" className="hover:text-[#c9a24e]">
-            Jugadoras
-          </Link>
+          {LINKS.map((l) => (
+            <Link key={l.href} href={l.href} className="hover:text-[#c9a24e]">
+              {l.label}
+            </Link>
+          ))}
         </nav>
         <button onClick={logout} className="text-sm text-zinc-400 hover:text-white">
           Salir
         </button>
       </header>
-      <div className="mx-auto max-w-3xl px-4 py-6">{children}</div>
+      <div className="mx-auto max-w-4xl px-4 py-6">{children}</div>
     </div>
   );
 }

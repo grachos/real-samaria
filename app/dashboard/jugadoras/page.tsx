@@ -1,47 +1,26 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
-
-type Player = {
-  id: string;
-  full_name: string;
-  shirt_number: number | null;
-  joined_on: string;
-  payment_due_date: string;
-  payment_reminder_date: string;
-};
+import { money, owedMonths, todayISO } from "@/lib/club";
+import { useClubData } from "@/lib/club-data";
 
 const input =
   "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-white outline-none focus:border-[#c9a24e]";
 
 export default function PlayersPage() {
-  const [players, setPlayers] = useState<Player[]>([]);
+  const { players, payments, fee, error: loadError, reload } = useClubData();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
     shirt_number: "",
     joined_on: "",
-    payment_due_date: "",
+    payment_day: "5",
   });
 
-  const load = useCallback(async () => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-    const { data, error: err } = await supabase
-      .from("players")
-      .select("id, full_name, shirt_number, joined_on, payment_due_date, payment_reminder_date")
-      .eq("active", true)
-      .order("shirt_number", { ascending: true, nullsFirst: false });
-    if (err) setError("No se pudo cargar la lista de jugadoras.");
-    else setPlayers(data ?? []);
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+  const today = todayISO();
+  const active = players.filter((p) => p.active);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -54,16 +33,23 @@ export default function PlayersPage() {
       full_name: form.full_name.trim(),
       shirt_number: form.shirt_number === "" ? null : Number(form.shirt_number),
       joined_on: form.joined_on,
-      payment_due_date: form.payment_due_date,
+      payment_day: Number(form.payment_day),
     });
     setSaving(false);
 
     if (err) {
-      setError("No se pudo guardar la jugadora. Revisa los datos.");
+      setError("No se pudo guardar. Revisa los datos (día de pago entre 4 y 28).");
       return;
     }
-    setForm({ full_name: "", shirt_number: "", joined_on: "", payment_due_date: "" });
-    load();
+    setForm({ full_name: "", shirt_number: "", joined_on: "", payment_day: "5" });
+    reload();
+  }
+
+  async function deactivate(id: string) {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    await supabase.from("players").update({ active: false }).eq("id", id);
+    reload();
   }
 
   return (
@@ -102,13 +88,15 @@ export default function PlayersPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm text-zinc-300 sm:col-span-2">
-            Fecha de pago (el recordatorio se calcula 3 días antes)
+            Día de pago mensual (entre 4 y 28)
             <input
-              type="date"
+              type="number"
               required
+              min={4}
+              max={28}
               className={input}
-              value={form.payment_due_date}
-              onChange={(e) => setForm({ ...form, payment_due_date: e.target.value })}
+              value={form.payment_day}
+              onChange={(e) => setForm({ ...form, payment_day: e.target.value })}
             />
           </label>
           {error && (
@@ -124,11 +112,17 @@ export default function PlayersPage() {
             {saving ? "Guardando..." : "Agregar jugadora"}
           </button>
         </form>
+        {loadError && <p className="mt-3 text-sm text-red-400">{loadError}</p>}
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Plantilla ({players.length})</h2>
-        {players.length === 0 ? (
+        <h2 className="mb-3 text-lg font-semibold">Plantilla ({active.length})</h2>
+        {!fee && (
+          <p className="mb-3 text-sm text-amber-400">
+            Define la cuota mensual en la pestaña Pagos para ver quién está al día.
+          </p>
+        )}
+        {active.length === 0 ? (
           <p className="text-sm text-zinc-500">Aún no hay jugadoras registradas.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -139,19 +133,44 @@ export default function PlayersPage() {
                   <th className="py-2 pr-3">Nombre</th>
                   <th className="py-2 pr-3">Ingreso</th>
                   <th className="py-2 pr-3">Pago</th>
-                  <th className="py-2">Recordatorio</th>
+                  <th className="py-2 pr-3">Recordatorio</th>
+                  <th className="py-2 pr-3">Estado</th>
+                  <th className="py-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {players.map((p) => (
-                  <tr key={p.id} className="border-t border-zinc-800">
-                    <td className="py-2 pr-3 text-[#c9a24e]">{p.shirt_number ?? "—"}</td>
-                    <td className="py-2 pr-3">{p.full_name}</td>
-                    <td className="py-2 pr-3">{p.joined_on}</td>
-                    <td className="py-2 pr-3">{p.payment_due_date}</td>
-                    <td className="py-2">{p.payment_reminder_date}</td>
-                  </tr>
-                ))}
+                {active.map((p) => {
+                  const owed = owedMonths(p, payments, fee, today);
+                  const total = owed.reduce((s, o) => s + o.remaining, 0);
+                  return (
+                    <tr key={p.id} className="border-t border-zinc-800">
+                      <td className="py-2 pr-3 text-[#c9a24e]">{p.shirt_number ?? "—"}</td>
+                      <td className="py-2 pr-3">{p.full_name}</td>
+                      <td className="py-2 pr-3">{p.joined_on}</td>
+                      <td className="py-2 pr-3">Día {p.payment_day}</td>
+                      <td className="py-2 pr-3">Día {p.payment_day - 3}</td>
+                      <td className="py-2 pr-3">
+                        {!fee ? (
+                          <span className="text-zinc-500">Sin cuota</span>
+                        ) : owed.length === 0 ? (
+                          <span className="text-emerald-400">Al día</span>
+                        ) : (
+                          <span className="text-red-400">
+                            Atrasada {owed.length} mes(es) · {money(total)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        <button
+                          onClick={() => deactivate(p.id)}
+                          className="text-xs text-zinc-500 hover:text-red-400"
+                        >
+                          Dar de baja
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
