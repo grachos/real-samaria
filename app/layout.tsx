@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es" className="h-full antialiased">
+    <html lang="es" className="h-full antialiased" style={{ colorScheme: "dark" }}>
       <body className="min-h-full flex flex-col">
         {children}
         <RegisterSW />

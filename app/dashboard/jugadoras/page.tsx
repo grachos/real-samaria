@@ -2,50 +2,52 @@
 
 import { FormEvent, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
-import { money, owedMonths, todayISO } from "@/lib/club";
+import { owedMonths, todayISO } from "@/lib/club";
 import { useClubData } from "@/lib/club-data";
+import { Icon } from "@/components/icons";
+import { Button, Card, Empty, Field, inputCls, Notice, PageHeader, StatusBadge } from "@/components/ui";
 
-const input =
-  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-base text-white outline-none focus:border-[#c9a24e]";
+const EMPTY = { full_name: "", shirt_number: "", joined_on: "" };
 
 export default function PlayersPage() {
   const { players, payments, fee, error: loadError, reload } = useClubData();
-  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    full_name: "",
-    shirt_number: "",
-    joined_on: "",
-    payment_day: "5",
-  });
+  const [error, setError] = useState<string | null>(null);
 
   const today = todayISO();
-  const active = players.filter((p) => p.active);
+  const rows = players
+    .filter((p) => p.active)
+    .map((p) => {
+      const owed = owedMonths(p, payments, fee, today);
+      return { p, owed, total: owed.reduce((s, o) => s + o.remaining, 0) };
+    });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     const supabase = getSupabase();
     if (!supabase) return;
-
     setSaving(true);
+    // El día de pago se define después en Configuración (por defecto día 5).
     const { error: err } = await supabase.from("players").insert({
       full_name: form.full_name.trim(),
       shirt_number: form.shirt_number === "" ? null : Number(form.shirt_number),
       joined_on: form.joined_on,
-      payment_day: Number(form.payment_day),
     });
     setSaving(false);
-
     if (err) {
-      setError("No se pudo guardar. Revisa los datos (día de pago entre 4 y 28).");
+      setError("No se pudo guardar. Revisa los datos.");
       return;
     }
-    setForm({ full_name: "", shirt_number: "", joined_on: "", payment_day: "5" });
+    setForm(EMPTY);
+    setOpen(false);
     reload();
   }
 
-  async function deactivate(id: string) {
+  async function deactivate(id: string, name: string) {
+    if (!window.confirm(`¿Dar de baja a ${name}?`)) return;
     const supabase = getSupabase();
     if (!supabase) return;
     await supabase.from("players").update({ active: false }).eq("id", id);
@@ -53,129 +55,152 @@ export default function PlayersPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <section>
-        <h1 className="mb-4 text-xl font-semibold text-[#c9a24e]">Nueva jugadora</h1>
-        <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm text-zinc-300 sm:col-span-2">
-            Nombre completo
-            <input
-              required
-              className={input}
-              value={form.full_name}
-              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-zinc-300">
-            Número
-            <input
-              type="number"
-              min={0}
-              max={99}
-              className={input}
-              value={form.shirt_number}
-              onChange={(e) => setForm({ ...form, shirt_number: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-zinc-300">
-            Fecha de ingreso al club
-            <input
-              type="date"
-              required
-              className={input}
-              value={form.joined_on}
-              onChange={(e) => setForm({ ...form, joined_on: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-zinc-300 sm:col-span-2">
-            Día de pago mensual (entre 4 y 28)
-            <input
-              type="number"
-              required
-              min={4}
-              max={28}
-              className={input}
-              value={form.payment_day}
-              onChange={(e) => setForm({ ...form, payment_day: e.target.value })}
-            />
-          </label>
-          {error && (
-            <p role="alert" className="text-sm text-red-400 sm:col-span-2">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-[#c9a24e] py-2 font-semibold text-black hover:opacity-90 disabled:opacity-50 sm:col-span-2"
-          >
-            {saving ? "Guardando..." : "Agregar jugadora"}
-          </button>
-        </form>
-        {loadError && <p className="mt-3 text-sm text-red-400">{loadError}</p>}
-      </section>
+    <>
+      <PageHeader
+        title="Jugadoras"
+        subtitle={`${rows.length} activas`}
+        action={
+          <Button onClick={() => setOpen((o) => !o)}>
+            <Icon name={open ? "close" : "plus"} className="h-4 w-4" />
+            {open ? "Cancelar" : "Nueva jugadora"}
+          </Button>
+        }
+      />
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Plantilla ({active.length})</h2>
-        {!fee && (
-          <p className="mb-3 text-sm text-amber-400">
-            Define la cuota mensual en la pestaña Pagos para ver quién está al día.
-          </p>
-        )}
-        {active.length === 0 ? (
-          <p className="text-sm text-zinc-500">Aún no hay jugadoras registradas.</p>
-        ) : (
-          <div className="overflow-x-auto">
+      {!fee && (
+        <div className="mb-6">
+          <Notice>Define la cuota mensual en Configuración para ver quién está al día.</Notice>
+        </div>
+      )}
+      {loadError && (
+        <div className="mb-6">
+          <Notice tone="error">{loadError}</Notice>
+        </div>
+      )}
+
+      {open && (
+        <Card className="mb-6">
+          <h2 className="mb-5 text-base font-semibold">Datos de la jugadora</h2>
+          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <Field label="Nombre completo">
+                <input
+                  required
+                  className={inputCls}
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                />
+              </Field>
+            </div>
+            <Field label="Número">
+              <input
+                type="number"
+                min={0}
+                max={99}
+                className={inputCls}
+                value={form.shirt_number}
+                onChange={(e) => setForm({ ...form, shirt_number: e.target.value })}
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Fecha de ingreso al club">
+                <input
+                  type="date"
+                  required
+                  className={inputCls}
+                  value={form.joined_on}
+                  onChange={(e) => setForm({ ...form, joined_on: e.target.value })}
+                />
+              </Field>
+            </div>
+            {error && (
+              <div className="sm:col-span-3">
+                <Notice tone="error">{error}</Notice>
+              </div>
+            )}
+            <div className="flex justify-end sm:col-span-3">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Guardando..." : "Guardar jugadora"}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {rows.length === 0 ? (
+        <Card>
+          <Empty>Aún no hay jugadoras. Agrega la primera con “Nueva jugadora”.</Empty>
+        </Card>
+      ) : (
+        <>
+          {/* Escritorio: tabla */}
+          <Card pad="none" className="hidden overflow-hidden md:block">
             <table className="w-full text-left text-sm">
-              <thead className="text-zinc-400">
+              <thead className="border-b border-zinc-800 text-xs uppercase tracking-wide text-zinc-500">
                 <tr>
-                  <th className="py-2 pr-3">N°</th>
-                  <th className="py-2 pr-3">Nombre</th>
-                  <th className="py-2 pr-3">Ingreso</th>
-                  <th className="py-2 pr-3">Pago</th>
-                  <th className="py-2 pr-3">Recordatorio</th>
-                  <th className="py-2 pr-3">Estado</th>
-                  <th className="py-2"></th>
+                  <th className="px-5 py-3 font-medium">N°</th>
+                  <th className="px-5 py-3 font-medium">Nombre</th>
+                  <th className="px-5 py-3 font-medium">Ingreso</th>
+                  <th className="px-5 py-3 font-medium">Paga el</th>
+                  <th className="px-5 py-3 font-medium">Recordatorio</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
-              <tbody>
-                {active.map((p) => {
-                  const owed = owedMonths(p, payments, fee, today);
-                  const total = owed.reduce((s, o) => s + o.remaining, 0);
-                  return (
-                    <tr key={p.id} className="border-t border-zinc-800">
-                      <td className="py-2 pr-3 text-[#c9a24e]">{p.shirt_number ?? "—"}</td>
-                      <td className="py-2 pr-3">{p.full_name}</td>
-                      <td className="py-2 pr-3">{p.joined_on}</td>
-                      <td className="py-2 pr-3">Día {p.payment_day}</td>
-                      <td className="py-2 pr-3">Día {p.payment_day - 3}</td>
-                      <td className="py-2 pr-3">
-                        {!fee ? (
-                          <span className="text-zinc-500">Sin cuota</span>
-                        ) : owed.length === 0 ? (
-                          <span className="text-emerald-400">Al día</span>
-                        ) : (
-                          <span className="text-red-400">
-                            Atrasada {owed.length} mes(es) · {money(total)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2">
-                        <button
-                          onClick={() => deactivate(p.id)}
-                          className="text-xs text-zinc-500 hover:text-red-400"
-                        >
-                          Dar de baja
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody className="divide-y divide-zinc-800">
+                {rows.map(({ p, owed, total }) => (
+                  <tr key={p.id} className="hover:bg-zinc-900/60">
+                    <td className="px-5 py-3 font-semibold text-[#c9a24e]">{p.shirt_number ?? "—"}</td>
+                    <td className="px-5 py-3 font-medium">{p.full_name}</td>
+                    <td className="px-5 py-3 text-zinc-400">{p.joined_on}</td>
+                    <td className="px-5 py-3 text-zinc-400">Día {p.payment_day}</td>
+                    <td className="px-5 py-3 text-zinc-400">Día {p.payment_day - 3}</td>
+                    <td className="px-5 py-3">
+                      <StatusBadge fee={fee} owed={owed} total={total} />
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={() => deactivate(p.id, p.full_name)}
+                        aria-label={`Dar de baja a ${p.full_name}`}
+                        className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                      >
+                        <Icon name="trash" className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
+          </Card>
+
+          {/* Móvil: tarjetas */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {rows.map(({ p, owed, total }) => (
+              <Card key={p.id} pad="sm" className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#c9a24e]/15 font-semibold text-[#c9a24e]">
+                  {p.shirt_number ?? "—"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{p.full_name}</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    Paga el día {p.payment_day} · recordatorio día {p.payment_day - 3}
+                  </p>
+                  <div className="mt-3">
+                    <StatusBadge fee={fee} owed={owed} total={total} />
+                  </div>
+                </div>
+                <button
+                  onClick={() => deactivate(p.id, p.full_name)}
+                  aria-label={`Dar de baja a ${p.full_name}`}
+                  className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                >
+                  <Icon name="trash" className="h-4 w-4" />
+                </button>
+              </Card>
+            ))}
           </div>
-        )}
-      </section>
-    </div>
+        </>
+      )}
+    </>
   );
 }

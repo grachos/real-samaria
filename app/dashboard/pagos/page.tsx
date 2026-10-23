@@ -1,25 +1,27 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { PAYMENT_METHODS, money, owedMonths, paidByMonth, todayISO } from "@/lib/club";
 import { useClubData } from "@/lib/club-data";
+import { Badge, Bar, Button, Card, Empty, Field, inputCls, Notice, PageHeader, StatusBadge, Tabs } from "@/components/ui";
 
-const input =
-  "rounded-lg border border-zinc-700 bg-black px-3 py-2 text-base text-white outline-none focus:border-[#c9a24e]";
+type Tab = "registrar" | "pendientes" | "historial";
 
 export default function PaymentsPage() {
   const { players, payments, fee, error: loadError, reload } = useClubData();
   const today = todayISO();
-  const thisMonth = today.slice(0, 7);
   const active = players.filter((p) => p.active);
   const names = Object.fromEntries(players.map((p) => [p.id, p.full_name]));
 
-  const [feeInput, setFeeInput] = useState("");
+  const [tab, setTab] = useState<Tab>("registrar");
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     player_id: "",
-    period: thisMonth,
+    period: today.slice(0, 7),
     amount: "",
     payment_method: "efectivo",
     bank: "",
@@ -29,235 +31,267 @@ export default function PaymentsPage() {
   const method = PAYMENT_METHODS.find((m) => m.value === form.payment_method);
   const selected = active.find((p) => p.id === form.player_id);
   const owed = selected ? owedMonths(selected, payments, fee, today) : [];
+  const owedTotal = owed.reduce((s, o) => s + o.remaining, 0);
   const periodPaid = selected ? (paidByMonth(payments, selected.id).get(form.period) ?? 0) : 0;
+  // El monto se precarga con la cuota configurada.
+  const amountValue = form.amount === "" && fee ? String(fee) : form.amount;
 
   const pending = active
     .map((p) => {
       const o = owedMonths(p, payments, fee, today);
-      return { player: p, owed: o, total: o.reduce((s, x) => s + x.remaining, 0) };
+      return { p, owed: o, total: o.reduce((s, x) => s + x.remaining, 0) };
     })
     .filter((x) => x.owed.length > 0)
     .sort((a, b) => b.total - a.total);
 
-  async function saveFee(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const supabase = getSupabase();
-    if (!supabase) return;
-    const value = Number(feeInput);
-    if (!value) return;
-    await supabase.from("club_settings").upsert({ id: 1, monthly_fee: value });
-    setFeeInput("");
-    reload();
-  }
-
   async function savePayment(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setSaved(false);
     const supabase = getSupabase();
     if (!supabase) return;
     if (method?.needsBank && !form.bank.trim()) {
       setError("Indica el banco o plataforma con la que se hizo el pago.");
       return;
     }
+    setSaving(true);
     const { error: err } = await supabase.from("payments").insert({
       player_id: form.player_id,
       period_month: `${form.period}-01`,
-      amount: Number(form.amount),
+      amount: Number(amountValue),
       payment_method: form.payment_method,
       bank: method?.needsBank ? form.bank.trim() : null,
       paid_on: form.paid_on,
     });
+    setSaving(false);
     if (err) {
       setError("No se pudo registrar el pago. Revisa los datos.");
       return;
     }
     setForm({ ...form, amount: "", bank: "" });
+    setSaved(true);
     reload();
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-3">
-        <h1 className="text-xl font-semibold text-[#c9a24e]">Cuota mensual</h1>
-        <p className="text-sm text-zinc-400">
-          Actual: {fee ? money(fee) : "sin definir"}
-        </p>
-        <form onSubmit={saveFee} className="flex gap-2">
-          <input
-            type="number"
-            min={1}
-            placeholder="Nuevo valor"
-            className={input}
-            value={feeInput}
-            onChange={(e) => setFeeInput(e.target.value)}
-          />
-          <button className="rounded-lg bg-zinc-800 px-4 py-2 hover:bg-zinc-700">Guardar</button>
-        </form>
-      </section>
+    <>
+      <PageHeader title="Pagos" subtitle="Registra cuotas y revisa quién debe" />
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Registrar pago</h2>
-        <form onSubmit={savePayment} className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm text-zinc-300 sm:col-span-2">
-            Jugadora
-            <select
-              required
-              className={input}
-              value={form.player_id}
-              onChange={(e) => setForm({ ...form, player_id: e.target.value })}
-            >
-              <option value="">Selecciona...</option>
-              {active.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
-          </label>
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "registrar", label: "Registrar" },
+          { value: "pendientes", label: `Pendientes (${pending.length})` },
+          { value: "historial", label: "Historial" },
+        ]}
+      />
 
-          {selected && (
-            <div className="rounded-lg border border-zinc-800 p-3 text-sm sm:col-span-2">
-              {!fee ? (
-                <p className="text-amber-400">Define la cuota mensual antes de registrar pagos.</p>
-              ) : owed.length === 0 ? (
-                <p className="text-emerald-400">Al día.</p>
-              ) : (
-                <p className="text-red-400">
-                  Atrasada en {owed.length} mes(es): {owed.map((o) => o.month).join(", ")} ·{" "}
-                  {money(owed.reduce((s, o) => s + o.remaining, 0))}
-                </p>
+      {loadError && (
+        <div className="mb-6">
+          <Notice tone="error">{loadError}</Notice>
+        </div>
+      )}
+      {!fee && (
+        <div className="mb-6">
+          <Notice>
+            Primero define la cuota mensual en{" "}
+            <Link href="/dashboard/configuracion" className="font-semibold underline">
+              Configuración
+            </Link>
+            .
+          </Notice>
+        </div>
+      )}
+
+      {tab === "registrar" && (
+        <div className="grid gap-6 md:grid-cols-5">
+          <Card className="md:col-span-3">
+            <form onSubmit={savePayment} className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Field label="Jugadora">
+                  <select
+                    required
+                    className={inputCls}
+                    value={form.player_id}
+                    onChange={(e) => setForm({ ...form, player_id: e.target.value })}
+                  >
+                    <option value="">Selecciona una jugadora</option>
+                    {active.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <Field label="Mes que cubre">
+                <input
+                  type="month"
+                  required
+                  className={inputCls}
+                  value={form.period}
+                  onChange={(e) => setForm({ ...form, period: e.target.value })}
+                />
+              </Field>
+              <Field label="Monto (COP)">
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  className={inputCls}
+                  value={amountValue}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                />
+              </Field>
+              <Field label="Método">
+                <select
+                  className={inputCls}
+                  value={form.payment_method}
+                  onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Banco / plataforma">
+                <input
+                  disabled={!method?.needsBank}
+                  required={method?.needsBank}
+                  placeholder={method?.needsBank ? "Ej. Bancolombia" : "No aplica para efectivo"}
+                  className={inputCls}
+                  value={form.bank}
+                  onChange={(e) => setForm({ ...form, bank: e.target.value })}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Fecha de pago">
+                  <input
+                    type="date"
+                    required
+                    className={inputCls}
+                    value={form.paid_on}
+                    onChange={(e) => setForm({ ...form, paid_on: e.target.value })}
+                  />
+                </Field>
+              </div>
+              {error && (
+                <div className="sm:col-span-2">
+                  <Notice tone="error">{error}</Notice>
+                </div>
               )}
-              {fee && (
-                <p className="mt-1 text-zinc-400">
-                  Pagado en {form.period}: {money(periodPaid)} de {money(fee)}
-                </p>
+              {saved && (
+                <div className="sm:col-span-2">
+                  <Notice tone="ok">Pago registrado.</Notice>
+                </div>
               )}
-            </div>
-          )}
+              <div className="flex justify-end sm:col-span-2">
+                <Button type="submit" disabled={!fee || !selected || saving}>
+                  {saving ? "Registrando..." : "Registrar pago"}
+                </Button>
+              </div>
+            </form>
+          </Card>
 
-          <label className="flex flex-col gap-1 text-sm text-zinc-300">
-            Mes que cubre
-            <input
-              type="month"
-              required
-              className={input}
-              value={form.period}
-              onChange={(e) => setForm({ ...form, period: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-zinc-300">
-            Monto
-            <input
-              type="number"
-              min={1}
-              required
-              className={input}
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-zinc-300">
-            Método
-            <select
-              className={input}
-              value={form.payment_method}
-              onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
-            >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-zinc-300">
-            Banco / plataforma
-            <input
-              disabled={!method?.needsBank}
-              required={method?.needsBank}
-              placeholder={method?.needsBank ? "Ej. Bancolombia" : "No aplica"}
-              className={input + " disabled:opacity-40"}
-              value={form.bank}
-              onChange={(e) => setForm({ ...form, bank: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-zinc-300 sm:col-span-2">
-            Fecha de pago
-            <input
-              type="date"
-              required
-              className={input}
-              value={form.paid_on}
-              onChange={(e) => setForm({ ...form, paid_on: e.target.value })}
-            />
-          </label>
-          {error && (
-            <p role="alert" className="text-sm text-red-400 sm:col-span-2">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={!fee}
-            className="rounded-lg bg-[#c9a24e] py-2 font-semibold text-black hover:opacity-90 disabled:opacity-50 sm:col-span-2"
-          >
-            Registrar pago
-          </button>
-        </form>
-        {loadError && <p className="mt-3 text-sm text-red-400">{loadError}</p>}
-      </section>
+          <Card className="self-start md:col-span-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Estado de la jugadora</p>
+            {!selected ? (
+              <Empty>Selecciona una jugadora para ver su estado.</Empty>
+            ) : (
+              <div className="mt-4 flex flex-col gap-5">
+                <p className="text-lg font-semibold">{selected.full_name}</p>
+                <StatusBadge fee={fee} owed={owed} total={owedTotal} />
+                {fee && (
+                  <div>
+                    <div className="mb-2 flex justify-between text-sm">
+                      <span className="text-zinc-400">Pagado en {form.period}</span>
+                      <span>
+                        {money(periodPaid)} de {money(fee)}
+                      </span>
+                    </div>
+                    <Bar value={(periodPaid / fee) * 100} />
+                  </div>
+                )}
+                {owed.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-sm text-zinc-400">Meses pendientes</p>
+                    <div className="flex flex-wrap gap-2">
+                      {owed.map((o) => (
+                        <Badge key={o.month} tone="late">
+                          {o.month} · {money(o.remaining)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Pendientes de pago ({pending.length})</h2>
-        {pending.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nadie tiene pagos atrasados.</p>
+      {tab === "pendientes" &&
+        (pending.length === 0 ? (
+          <Card>
+            <Empty>Nadie tiene pagos atrasados.</Empty>
+          </Card>
         ) : (
-          <ul className="flex flex-col gap-2 text-sm">
+          <div className="flex flex-col gap-3">
             {pending.map((x) => (
-              <li key={x.player.id} className="rounded-lg border border-zinc-800 p-3">
-                <span className="font-medium">{x.player.full_name}</span>{" "}
-                <span className="text-zinc-400">
-                  · {x.owed.map((o) => o.month).join(", ")} · {money(x.total)}
-                </span>
-              </li>
+              <Card key={x.p.id} pad="sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{x.p.full_name}</p>
+                    <p className="text-xs text-zinc-500">Paga el día {x.p.payment_day}</p>
+                  </div>
+                  <p className="text-lg font-semibold text-red-300">{money(x.total)}</p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {x.owed.map((o) => (
+                    <Badge key={o.month} tone="late">
+                      {o.month}
+                    </Badge>
+                  ))}
+                </div>
+              </Card>
             ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Pagos recientes</h2>
-        {payments.length === 0 ? (
-          <p className="text-sm text-zinc-500">Aún no hay pagos.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-zinc-400">
-                <tr>
-                  <th className="py-2 pr-3">Fecha</th>
-                  <th className="py-2 pr-3">Jugadora</th>
-                  <th className="py-2 pr-3">Mes</th>
-                  <th className="py-2 pr-3">Monto</th>
-                  <th className="py-2 pr-3">Método</th>
-                  <th className="py-2">Banco</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.slice(0, 30).map((p) => (
-                  <tr key={p.id} className="border-t border-zinc-800">
-                    <td className="py-2 pr-3">{p.paid_on}</td>
-                    <td className="py-2 pr-3">{names[p.player_id] ?? "—"}</td>
-                    <td className="py-2 pr-3">{p.period_month.slice(0, 7)}</td>
-                    <td className="py-2 pr-3">{money(Number(p.amount))}</td>
-                    <td className="py-2 pr-3">{p.payment_method}</td>
-                    <td className="py-2">{p.bank ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        )}
-      </section>
-    </div>
+        ))}
+
+      {tab === "historial" &&
+        (payments.length === 0 ? (
+          <Card>
+            <Empty>Aún no hay pagos registrados.</Empty>
+          </Card>
+        ) : (
+          <Card pad="none">
+            <ul className="divide-y divide-zinc-800">
+              {payments.slice(0, 50).map((p) => {
+                const label = PAYMENT_METHODS.find((m) => m.value === p.payment_method)?.label ?? p.payment_method;
+                return (
+                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <div className="min-w-0">
+                      <p className="font-medium">{names[p.player_id] ?? "—"}</p>
+                      <p className="text-xs text-zinc-500">
+                        Pagó el {p.paid_on} · cubre {p.period_month.slice(0, 7)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-[#c9a24e]">{money(Number(p.amount))}</p>
+                      <p className="text-xs text-zinc-400">
+                        {label}
+                        {p.bank ? ` · ${p.bank}` : ""}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        ))}
+    </>
   );
 }
