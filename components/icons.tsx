@@ -15,7 +15,8 @@ export type IconName =
   | "gauge"
   | "download"
   | "edit"
-  | "undo";
+  | "undo"
+  | "whatsapp";
 
 const PATHS: Record<IconName, ReactNode> = {
   users: (
@@ -67,6 +68,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M3 7v6h6" />
       <path d="M21 17a9 9 0 0 0-15-6.7L3 13" />
+    </>
+  ),
+  whatsapp: (
+    <>
+      <path d="M3 21l1.7-5A9 9 0 1 1 8 19.3L3 21Z" />
+      <path d="M9 10c.5 2.5 2.5 4.5 5 5l1.3-1.3a.7.7 0 0 1 .7-.2l2 .6" />
     </>
   ),
   download: (

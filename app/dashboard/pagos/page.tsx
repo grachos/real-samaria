@@ -1,11 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
-import { PAYMENT_METHODS, money, owedMonths, paidByMonth, todayISO } from "@/lib/club";
+import {
+  PAYMENT_METHODS,
+  money,
+  owedMonths,
+  paidByMonth,
+  todayISO,
+} from "@/lib/club";
 import { useClubData } from "@/lib/club-data";
-import { Badge, Bar, Button, Card, Empty, Field, inputCls, Notice, PageHeader, StatusBadge, Tabs } from "@/components/ui";
+import { Icon } from "@/components/icons";
+import {
+  Badge,
+  Bar,
+  Button,
+  Card,
+  Empty,
+  Field,
+  inputCls,
+  Notice,
+  PageHeader,
+  StatusBadge,
+  Tabs,
+} from "@/components/ui";
 
 type Tab = "registrar" | "pendientes" | "historial";
 
@@ -18,6 +37,12 @@ export default function PaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [lastSent, setLastSent] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState<string | null>(null);
+  const [wa, setWa] = useState<{
+    tone: "ok" | "error" | "info";
+    text: string;
+  } | null>(null);
   const [form, setForm] = useState({
     player_id: "",
     period: today.slice(0, 7),
@@ -28,13 +53,17 @@ export default function PaymentsPage() {
   });
 
   // Las jugadoras dadas de baja siguen apareciendo mientras tengan deuda pendiente.
-  const active = players.filter((p) => p.active || owedMonths(p, payments, fee, today).length > 0);
+  const active = players.filter(
+    (p) => p.active || owedMonths(p, payments, fee, today).length > 0,
+  );
 
   const method = PAYMENT_METHODS.find((m) => m.value === form.payment_method);
   const selected = active.find((p) => p.id === form.player_id);
   const owed = selected ? owedMonths(selected, payments, fee, today) : [];
   const owedTotal = owed.reduce((s, o) => s + o.remaining, 0);
-  const periodPaid = selected ? (paidByMonth(payments, selected.id).get(form.period) ?? 0) : 0;
+  const periodPaid = selected
+    ? (paidByMonth(payments, selected.id).get(form.period) ?? 0)
+    : 0;
   // El monto se precarga con la cuota configurada.
   const amountValue = form.amount === "" && fee ? String(fee) : form.amount;
 
@@ -45,6 +74,64 @@ export default function PaymentsPage() {
     })
     .filter((x) => x.owed.length > 0)
     .sort((a, b) => b.total - a.total);
+
+  const loadLog = useCallback(async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const { data } = await supabase
+      .from("whatsapp_log")
+      .select("player_id, sent_at")
+      .eq("status", "sent")
+      .order("sent_at", { ascending: false });
+    const m: Record<string, string> = {};
+    (data ?? []).forEach((r) => {
+      if (!m[r.player_id]) m[r.player_id] = r.sent_at;
+    });
+    setLastSent(m);
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial desde Supabase
+    loadLog();
+  }, [loadLog]);
+
+  // ids vacío = todas las atrasadas con celular.
+  async function sendReminders(ids: string[] | null, key: string) {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    setSending(key);
+    setWa(null);
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch("/api/recordatorios", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
+      },
+      body: JSON.stringify(ids ? { player_ids: ids } : {}),
+    }).catch(() => null);
+    const out = res ? await res.json().catch(() => null) : null;
+    setSending(null);
+    if (!res || !res.ok || !out) {
+      setWa({
+        tone: "error",
+        text: out?.error ?? "No se pudo enviar el aviso.",
+      });
+      return;
+    }
+    const parts = [`${out.sent} enviados`];
+    if (out.failed) parts.push(`${out.failed} fallidos`);
+    if (out.skipped?.length) {
+      parts.push(
+        `sin enviar: ${out.skipped.map((x: { name: string; reason: string }) => `${x.name} (${x.reason})`).join(", ")}`,
+      );
+    }
+    setWa({
+      tone: out.failed ? "error" : out.sent ? "ok" : "info",
+      text: parts.join(" · "),
+    });
+    loadLog();
+  }
 
   async function savePayment(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -77,7 +164,10 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <PageHeader title="Pagos" subtitle="Registra cuotas y revisa quién debe" />
+      <PageHeader
+        title="Pagos"
+        subtitle="Registra cuotas y revisa quién debe"
+      />
 
       <Tabs
         value={tab}
@@ -98,7 +188,10 @@ export default function PaymentsPage() {
         <div className="mb-6">
           <Notice>
             Primero define la cuota mensual en{" "}
-            <Link href="/dashboard/configuracion" className="font-semibold underline">
+            <Link
+              href="/dashboard/configuracion"
+              className="font-semibold underline"
+            >
               Configuración
             </Link>
             .
@@ -116,7 +209,9 @@ export default function PaymentsPage() {
                     required
                     className={inputCls}
                     value={form.player_id}
-                    onChange={(e) => setForm({ ...form, player_id: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, player_id: e.target.value })
+                    }
                   >
                     <option value="">Selecciona una jugadora</option>
                     {active.map((p) => (
@@ -151,7 +246,9 @@ export default function PaymentsPage() {
                 <select
                   className={inputCls}
                   value={form.payment_method}
-                  onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, payment_method: e.target.value })
+                  }
                 >
                   {PAYMENT_METHODS.map((m) => (
                     <option key={m.value} value={m.value}>
@@ -164,7 +261,11 @@ export default function PaymentsPage() {
                 <input
                   disabled={!method?.needsBank}
                   required={method?.needsBank}
-                  placeholder={method?.needsBank ? "Ej. Bancolombia" : "No aplica para efectivo"}
+                  placeholder={
+                    method?.needsBank
+                      ? "Ej. Bancolombia"
+                      : "No aplica para efectivo"
+                  }
                   className={inputCls}
                   value={form.bank}
                   onChange={(e) => setForm({ ...form, bank: e.target.value })}
@@ -177,7 +278,9 @@ export default function PaymentsPage() {
                     required
                     className={inputCls}
                     value={form.paid_on}
-                    onChange={(e) => setForm({ ...form, paid_on: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, paid_on: e.target.value })
+                    }
                   />
                 </Field>
               </div>
@@ -200,7 +303,9 @@ export default function PaymentsPage() {
           </Card>
 
           <Card className="self-start md:col-span-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Estado de la jugadora</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+              Estado de la jugadora
+            </p>
             {!selected ? (
               <Empty>Selecciona una jugadora para ver su estado.</Empty>
             ) : (
@@ -210,7 +315,9 @@ export default function PaymentsPage() {
                 {fee && (
                   <div>
                     <div className="mb-2 flex justify-between text-sm">
-                      <span className="text-zinc-400">Pagado en {form.period}</span>
+                      <span className="text-zinc-400">
+                        Pagado en {form.period}
+                      </span>
                       <span>
                         {money(periodPaid)} de {money(fee)}
                       </span>
@@ -220,7 +327,9 @@ export default function PaymentsPage() {
                 )}
                 {owed.length > 0 && (
                   <div>
-                    <p className="mb-2 text-sm text-zinc-400">Meses pendientes</p>
+                    <p className="mb-2 text-sm text-zinc-400">
+                      Meses pendientes
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {owed.map((o) => (
                         <Badge key={o.month} tone="late">
@@ -243,14 +352,41 @@ export default function PaymentsPage() {
           </Card>
         ) : (
           <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-zinc-400">
+                Aviso por WhatsApp a quienes tienen cuotas atrasadas.
+              </p>
+              <Button
+                variant="secondary"
+                disabled={sending !== null}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "¿Enviar aviso por WhatsApp a todas las atrasadas que tengan celular?",
+                    )
+                  ) {
+                    sendReminders(null, "all");
+                  }
+                }}
+              >
+                <Icon name="whatsapp" className="h-4 w-4" />
+                {sending === "all" ? "Enviando..." : "Avisar a todas"}
+              </Button>
+            </div>
+            {wa && <Notice tone={wa.tone}>{wa.text}</Notice>}
             {pending.map((x) => (
               <Card key={x.p.id} pad="sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{x.p.full_name}</p>
-                    <p className="text-xs text-zinc-500">Paga el día {x.p.payment_day}</p>
+                    <p className="text-xs text-zinc-500">
+                      Paga el día {x.p.payment_day}
+                      {x.p.active ? "" : " · de baja"}
+                    </p>
                   </div>
-                  <p className="text-lg font-semibold text-red-300">{money(x.total)}</p>
+                  <p className="text-lg font-semibold text-red-300">
+                    {money(x.total)}
+                  </p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {x.owed.map((o) => (
@@ -259,6 +395,25 @@ export default function PaymentsPage() {
                     </Badge>
                   ))}
                 </div>
+                {x.p.active && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 pt-3">
+                    <p className="text-xs text-zinc-500">
+                      {!x.p.phone
+                        ? "Sin celular registrado"
+                        : lastSent[x.p.id]
+                          ? `Último aviso: ${new Date(lastSent[x.p.id]).toLocaleDateString("es-CO")}`
+                          : "Aún sin avisos"}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      disabled={!x.p.phone || sending !== null}
+                      onClick={() => sendReminders([x.p.id], x.p.id)}
+                    >
+                      <Icon name="whatsapp" className="h-4 w-4" />
+                      {sending === x.p.id ? "Enviando..." : "Enviar aviso"}
+                    </Button>
+                  </div>
+                )}
               </Card>
             ))}
           </div>
@@ -273,9 +428,14 @@ export default function PaymentsPage() {
           <Card pad="none">
             <ul className="divide-y divide-zinc-800">
               {payments.slice(0, 50).map((p) => {
-                const label = PAYMENT_METHODS.find((m) => m.value === p.payment_method)?.label ?? p.payment_method;
+                const label =
+                  PAYMENT_METHODS.find((m) => m.value === p.payment_method)
+                    ?.label ?? p.payment_method;
                 return (
-                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <li
+                    key={p.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+                  >
                     <div className="min-w-0">
                       <p className="font-medium">{names[p.player_id] ?? "—"}</p>
                       <p className="text-xs text-zinc-500">
@@ -283,7 +443,9 @@ export default function PaymentsPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-[#c9a24e]">{money(Number(p.amount))}</p>
+                      <p className="font-semibold text-[#c9a24e]">
+                        {money(Number(p.amount))}
+                      </p>
                       <p className="text-xs text-zinc-400">
                         {label}
                         {p.bank ? ` · ${p.bank}` : ""}

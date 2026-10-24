@@ -18,7 +18,7 @@ import {
 } from "@/components/ui";
 import type { Player } from "@/lib/club";
 
-const EMPTY = { full_name: "", shirt_number: "", joined_on: "" };
+const EMPTY = { full_name: "", shirt_number: "", joined_on: "", phone: "" };
 
 export default function PlayersPage() {
   const { players, payments, fee, error: loadError, reload } = useClubData();
@@ -46,6 +46,7 @@ export default function PlayersPage() {
       full_name: p.full_name,
       shirt_number: p.shirt_number === null ? "" : String(p.shirt_number),
       joined_on: p.joined_on,
+      phone: p.phone ?? "",
     });
     setError(null);
     setOpen(true);
@@ -70,6 +71,10 @@ export default function PlayersPage() {
       shirt_number: form.shirt_number === "" ? null : Number(form.shirt_number),
       joined_on: form.joined_on,
     };
+    // El celular solo se envía si hay algo que guardar o borrar (evita fallar si falta la columna).
+    const hadPhone = Boolean(players.find((x) => x.id === editingId)?.phone);
+    if (form.phone.trim() || hadPhone)
+      Object.assign(values, { phone: form.phone.trim() || null });
     // El día de pago se define después en Configuración (por defecto día 5).
     const { error: err } = editingId
       ? await supabase.from("players").update(values).eq("id", editingId)
@@ -218,6 +223,18 @@ export default function PlayersPage() {
                 />
               </Field>
             </div>
+            <div className="sm:col-span-3">
+              <Field label="Celular (WhatsApp)">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="3001234567"
+                  className={inputCls}
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
+              </Field>
+            </div>
             {error && (
               <div className="sm:col-span-3">
                 <Notice tone="error">{error}</Notice>
@@ -276,7 +293,7 @@ export default function PlayersPage() {
                   <th className="px-5 py-3 font-medium">Nombre</th>
                   <th className="px-5 py-3 font-medium">Ingreso</th>
                   <th className="px-5 py-3 font-medium">Paga el</th>
-                  <th className="px-5 py-3 font-medium">Recordatorio</th>
+                  <th className="px-5 py-3 font-medium">Celular</th>
                   <th className="px-5 py-3 font-medium">Estado</th>
                   <th className="px-5 py-3" />
                 </tr>
@@ -295,7 +312,7 @@ export default function PlayersPage() {
                         Día {p.payment_day}
                       </td>
                       <td className="px-5 py-3 text-zinc-400">
-                        Día {p.payment_day - 3}
+                        {p.phone || "—"}
                       </td>
                       <td className="px-5 py-3">{status(r)}</td>
                       <td className="px-5 py-3 text-right">{actions(p)}</td>
@@ -318,8 +335,8 @@ export default function PlayersPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{p.full_name}</p>
                     <p className="mt-0.5 text-xs text-zinc-500">
-                      Paga el día {p.payment_day} · recordatorio día{" "}
-                      {p.payment_day - 3}
+                      Paga el día {p.payment_day}
+                      {p.phone ? ` · ${p.phone}` : ""}
                     </p>
                     <div className="mt-3">{status(r)}</div>
                   </div>

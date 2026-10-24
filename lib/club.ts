@@ -15,6 +15,7 @@ export type Player = {
   payment_day: number;
   active: boolean;
   deactivated_on?: string | null;
+  phone?: string | null;
 };
 
 export type Payment = {
