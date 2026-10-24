@@ -116,11 +116,12 @@ export async function sendOverdueReminders(opts: {
     }
 
     const total = owed.reduce((sum, o) => sum + o.remaining, 0);
-    const params = [
-      player.full_name.split(" ")[0],
-      money(total),
-      owed.map((o) => monthLabel(o.month)).join(", "),
-    ];
+    // La plantilla de Kapso usa parámetros con nombre (NAMED)
+    const params = {
+      nombre: player.full_name.split(" ")[0],
+      concepto: `un saldo de ${money(total)}`,
+      periodo: owed.map((o) => monthLabel(o.month)).join(", "),
+    };
 
     let status: "sent" | "failed" = "sent";
     let error: string | null = null;
