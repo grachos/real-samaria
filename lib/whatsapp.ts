@@ -49,12 +49,14 @@ export async function sendOverdueReminders(opts: {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const kapsoKey = process.env.KAPSO_API_KEY;
-  const templateId = process.env.KAPSO_TEMPLATE_ID;
+  const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID;
+  const templateName =
+    process.env.KAPSO_TEMPLATE_NAME ?? "recordatorio_cuota_real_samaria";
   if (!url || !service)
     throw new Error("Falta SUPABASE_SERVICE_ROLE_KEY en el servidor.");
-  if (!kapsoKey || !templateId)
+  if (!kapsoKey || !phoneNumberId)
     throw new Error(
-      "Falta configurar KAPSO_API_KEY y KAPSO_TEMPLATE_ID en el servidor.",
+      "Falta configurar KAPSO_API_KEY y KAPSO_PHONE_NUMBER_ID en el servidor.",
     );
 
   const db = createClient(url, service, {
@@ -116,26 +118,42 @@ export async function sendOverdueReminders(opts: {
     }
 
     const total = owed.reduce((sum, o) => sum + o.remaining, 0);
-    // La plantilla de Kapso usa parámetros con nombre (NAMED)
-    const params = {
-      nombre: player.full_name.split(" ")[0],
-      concepto: `un saldo de ${money(total)}`,
-      periodo: owed.map((o) => monthLabel(o.month)).join(", "),
-    };
+    // La plantilla usa parámetros con nombre (NAMED)
+    const params = [
+      { name: "nombre", text: player.full_name.split(" ")[0] },
+      { name: "concepto", text: `un saldo de ${money(total)}` },
+      { name: "periodo", text: owed.map((o) => monthLabel(o.month)).join(", ") },
+    ];
 
     let status: "sent" | "failed" = "sent";
     let error: string | null = null;
     try {
       const res = await fetch(
-        `https://api.kapso.ai/whatsapp_templates/${encodeURIComponent(templateId)}/send_template`,
+        `https://api.kapso.ai/meta/whatsapp/v24.0/${encodeURIComponent(phoneNumberId)}/messages`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${kapsoKey}`,
+            "X-API-Key": kapsoKey,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            template: { phone_number: phone, template_parameters: params },
+            messaging_product: "whatsapp",
+            to: phone.replace(/^\+/, ""),
+            type: "template",
+            template: {
+              name: templateName,
+              language: { code: "es" },
+              components: [
+                {
+                  type: "body",
+                  parameters: params.map((p) => ({
+                    type: "text",
+                    parameter_name: p.name,
+                    text: p.text,
+                  })),
+                },
+              ],
+            },
           }),
         },
       );
