@@ -52,6 +52,7 @@ export async function sendOverdueReminders(opts: {
   const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID;
   const templateName =
     process.env.KAPSO_TEMPLATE_NAME ?? "recordatorio_cuota_real_samaria";
+  const templateLanguage = process.env.KAPSO_TEMPLATE_LANGUAGE ?? "en_US";
   if (!url || !service)
     throw new Error("Falta SUPABASE_SERVICE_ROLE_KEY en el servidor.");
   if (!kapsoKey || !phoneNumberId)
@@ -142,7 +143,7 @@ export async function sendOverdueReminders(opts: {
             type: "template",
             template: {
               name: templateName,
-              language: { code: "es" },
+              language: { code: templateLanguage },
               components: [
                 {
                   type: "body",
